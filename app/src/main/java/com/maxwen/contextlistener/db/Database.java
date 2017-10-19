@@ -6,7 +6,10 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.location.Location;
+import android.net.Uri;
 import android.support.annotation.NonNull;
+
+import com.maxwen.contextlistener.provider.EventProvider;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -29,6 +32,7 @@ public class Database extends SQLiteOpenHelper {
     public static final int KEY_TYPE_BT = 3;
     public static final int KEY_TYPE_NFC = 4;
     public static final int KEY_TYPE_POWER = 5;
+    public static final int KEY_TYPE_GEFOENCE = 6;
 
     public static final String KEY_LOCATION_LAT = "lat";
     public static final String KEY_LOCATION_LONG = "long";
@@ -37,9 +41,17 @@ public class Database extends SQLiteOpenHelper {
     public static final String KEY_BT_DEVICE_NAME = "device";
     public static final String KEY_NFC_TAG_ID = "tag";
     public static final String KEY_POWER_CHARGING = "charging";
+    public static final String KEY_GEOFENCE_NAME = "name";
+    public static final String KEY_GEOFENCE_ACTION_TYPE = "action";
+    public static final String KEY_GEOFENCE_ACTION_ENTER = "enter";
+    public static final String KEY_GEOFENCE_ACTION_LEAVE = "leave";
+    public static final String KEY_GEOFENCE_ACTION_CREATE = "create";
+
+    private Context mContext;
 
     public Database(@NonNull Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        mContext = context;
     }
 
     @Override
@@ -75,6 +87,7 @@ public class Database extends SQLiteOpenHelper {
             values.put(KEY_TYPE, KEY_TYPE_LOCATION);
             values.put(KEY_DATA, locationData.toString());
             db.insert(TABLE_EVENTS, null, values);
+            updateProvider();
         } catch (JSONException e) {
 
         } finally {
@@ -113,6 +126,8 @@ public class Database extends SQLiteOpenHelper {
             values.put(KEY_TYPE, KEY_TYPE_NETWORK);
             values.put(KEY_DATA, networkData.toString());
             db.insert(TABLE_EVENTS, null, values);
+            updateProvider();
+            updateNetworkProvider();
         } catch (JSONException e) {
 
         } finally {
@@ -148,6 +163,7 @@ public class Database extends SQLiteOpenHelper {
             values.put(KEY_TYPE, KEY_TYPE_BT);
             values.put(KEY_DATA, btDeviceData.toString());
             db.insert(TABLE_EVENTS, null, values);
+            updateProvider();
         } catch (JSONException e) {
 
         } finally {
@@ -183,6 +199,7 @@ public class Database extends SQLiteOpenHelper {
             values.put(KEY_TYPE, KEY_TYPE_NFC);
             values.put(KEY_DATA, nfcData.toString());
             db.insert(TABLE_EVENTS, null, values);
+            updateProvider();
         } catch (JSONException e) {
 
         } finally {
@@ -202,6 +219,7 @@ public class Database extends SQLiteOpenHelper {
             values.put(KEY_TYPE, KEY_TYPE_POWER);
             values.put(KEY_DATA, networkData.toString());
             db.insert(TABLE_EVENTS, null, values);
+            updateProvider();
         } catch (JSONException e) {
 
         } finally {
@@ -232,9 +250,54 @@ public class Database extends SQLiteOpenHelper {
         return cursor;
     }
 
+    public Cursor query(String[] projection,
+            String selection,
+            String[] selectionArgs,
+            String sortOrder) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        return db.query(TABLE_EVENTS, projection, selection, selectionArgs, null, null, sortOrder);
+    }
+
     public void clearDB() {
         SQLiteDatabase db = this.getWritableDatabase();
         db.execSQL("delete from "+ TABLE_EVENTS);
         db.close();
+    }
+
+    private void updateProvider() {
+        mContext.getContentResolver().notifyChange(
+                Uri.parse("content://" + EventProvider.AUTHORITY + "/events/all"), null);
+    }
+
+    private void updateNetworkProvider() {
+        mContext.getContentResolver().notifyChange(
+                Uri.parse("content://" + EventProvider.AUTHORITY + "/events/network"), null);
+    }
+
+    private void updateGeofenceProvider() {
+        mContext.getContentResolver().notifyChange(
+                Uri.parse("content://" + EventProvider.AUTHORITY + "/events/geofence"), null);
+    }
+
+    public void addGeofenceEvent(long timeStamp, String geoFenceId, String action) {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        try {
+            JSONObject fenceDate = new JSONObject();
+            fenceDate.put(KEY_GEOFENCE_NAME, geoFenceId);
+            fenceDate.put(KEY_GEOFENCE_ACTION_TYPE, action);
+
+            ContentValues values = new ContentValues();
+            values.put(KEY_TIMESTAMP, timeStamp);
+            values.put(KEY_TYPE, KEY_TYPE_GEFOENCE);
+            values.put(KEY_DATA, fenceDate.toString());
+            db.insert(TABLE_EVENTS, null, values);
+            updateProvider();
+            updateGeofenceProvider();
+        } catch (JSONException e) {
+
+        } finally {
+            db.close();
+        }
     }
 }

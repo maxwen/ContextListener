@@ -2,7 +2,6 @@ package com.maxwen.contextlistener.location;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Criteria;
 import android.location.Location;
@@ -12,20 +11,19 @@ import android.util.Log;
 
 import com.maxwen.contextlistener.db.Database;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 public class LocationService  {
     private static final String TAG = "LocationService";
     private static final boolean DEBUG = true;
-    public static final String ACTION_BROADCAST = "com.maxwen.contextlistener.location.LOCATION_UPDATE";
     static final String ACTION_CANCEL_LOCATION_UPDATE =
             "com.maxwen.contextlistener.location.CANCEL_LOCATION_UPDATE";
 
     private static final float LOCATION_ACCURACY_THRESHOLD_METERS = 50000;
-    public static final long LOCATION_REQUEST_TIMEOUT = 5L * 60L * 1000L; // request for at most 5 minutes
     private static final long OUTDATED_LOCATION_THRESHOLD_MILLIS = 10L * 60L * 1000L; // 10 minutes
-    private static final float LOCATION_EQUALS_THRESHOLD_METERS = 50;
+
+    public static final float LOCATION_EQUALS_THRESHOLD_METERS = 100;
+    public static final long LOCATION_REQUEST_MIN_TIME = 0;
 
     private static final Criteria sLocationCriteria;
 
@@ -41,10 +39,6 @@ public class LocationService  {
 
     private static Location getCurrentLocation(Context context, CustomLocationListener locationListener) throws SecurityException {
         LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-        if (!lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-            Log.w(TAG, "network locations disabled");
-            return null;
-        }
         Location location = lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
         if (DEBUG) Log.d(TAG, "Current location is " + location);
 
@@ -81,9 +75,6 @@ public class LocationService  {
             if (location != null && isNewLocation(context, location)) {
                 Database database = new Database(context);
                 database.addLocationEvent(System.currentTimeMillis(), location);
-
-                Intent updateIntent = new Intent(ACTION_BROADCAST);
-                context.sendBroadcast(updateIntent);
             }
         } else {
             Log.w(TAG, "no location permissions");
@@ -97,9 +88,6 @@ public class LocationService  {
             if (location != null && isNewLocation(context, location)) {
                 Database database = new Database(context);
                 database.addLocationEvent(System.currentTimeMillis(), location);
-
-                Intent updateIntent = new Intent(ACTION_BROADCAST);
-                context.sendBroadcast(updateIntent);
             }
         } else {
             Log.w(TAG, "no location permissions");

@@ -12,17 +12,12 @@ import org.json.JSONObject;
 public class BluetoothService {
     private static final String TAG = "PowerService";
     private static final boolean DEBUG = true;
-    public static final String ACTION_BROADCAST = "com.maxwen.contextlistener.bluetooth.BLUETOOTH_UPDATE";
-
 
     public static void handleBTConnect(Context context, Intent intent, boolean connected) {
         String deviceName = getBTDeviceName(context, intent);
         if (isNewBTDevice(context, deviceName, connected)) {
             Database database = new Database(context);
             database.addBTEvent(System.currentTimeMillis(), connected ? deviceName : "none");
-
-            Intent updateIntent = new Intent(ACTION_BROADCAST);
-            context.sendBroadcast(updateIntent);
         }
     }
 

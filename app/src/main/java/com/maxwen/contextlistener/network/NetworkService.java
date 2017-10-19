@@ -1,7 +1,6 @@
 package com.maxwen.contextlistener.network;
 
 import android.content.Context;
-import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
@@ -10,23 +9,18 @@ import android.util.Log;
 
 import com.maxwen.contextlistener.db.Database;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 public class NetworkService {
     private static final String TAG = "NetworkService";
     private static final boolean DEBUG = true;
-    public static final String ACTION_BROADCAST = "com.maxwen.contextlistener.network.NETWORK_UPDATE";
 
     public static void updateNetworkInfo(Context context) {
         if (isNetworkAvailable(context) && isNewNetwork(context, getNetworkType(context), getWifiName(context))) {
             if (DEBUG) Log.d(TAG, "Update network");
 
             Database database = new Database(context);
-            database.addNetworkEvent(System.currentTimeMillis(), getNetworkType(context), getWifiName(context));
-
-            Intent updateIntent = new Intent(ACTION_BROADCAST);
-            context.sendBroadcast(updateIntent);
+            database.addNetworkEvent(System.currentTimeMillis(), getNetworkType(context), isWifiNetwork(context) ? getWifiName(context) : null);
         }
     }
 
@@ -40,18 +34,42 @@ public class NetworkService {
     }
 
     private static String getNetworkType(Context context) {
+        if (isWifiNetwork(context)) {
+            return "wifi";
+        }
+        if (isWMobileNetwork(context)) {
+            return "mobile";
+        }
         ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo info = cm.getActiveNetworkInfo();
         if (info != null && info.isConnected()) {
-            if (info.getType() == ConnectivityManager.TYPE_WIFI) {
-                return "wifi";
-            } else if (info.getType() == ConnectivityManager.TYPE_MOBILE) {
-                return "mobile";
-            } else {
-                return "unknown";
-            }
+            return "unknown";
         }
         return "offline";
+    }
+
+    private static boolean isWifiNetwork(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if (info != null && info.isConnected()) {
+            if (info.getType() == ConnectivityManager.TYPE_WIFI ||
+                    info.getType() == ConnectivityManager.TYPE_WIMAX) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isWMobileNetwork(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if (info != null && info.isConnected()) {
+            if (info.getType() == ConnectivityManager.TYPE_MOBILE ||
+                    info.getType() == ConnectivityManager.TYPE_MOBILE_DUN) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String getWifiName(Context context) {
