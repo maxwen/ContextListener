@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -56,7 +57,13 @@ public class EventService extends Service {
                     startEventService(context);
                 }
                 if (ConnectivityManager.CONNECTIVITY_ACTION.equals(action)) {
-                    NetworkService.updateNetworkInfo(context);
+                    NetworkService.updateNetworkInfo(context, intent);
+                }
+
+                if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
+                    if(intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1) == BluetoothAdapter.STATE_OFF){
+                        BluetoothService.handleBTDisable(context, intent);
+                    }
                 }
 
                 if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
@@ -155,7 +162,6 @@ public class EventService extends Service {
                 return START_NOT_STICKY;
             }
 
-            NetworkService.updateNetworkInfo(this);
             if (checkLocationEnabled()) {
                 LocationService.updateLocation(this, mLocationListener);
             }
@@ -183,6 +189,7 @@ public class EventService extends Service {
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
         filter.addAction(LocationManager.MODE_CHANGED_ACTION);
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
 
         this.registerReceiver(mStateListener, filter);
 

@@ -34,10 +34,12 @@ public class GeofenceService {
      * stops tracking the geofence.
      */
     private static final long GEOFENCE_EXPIRATION_IN_HOURS = 12;
+    private static final int GEOFENCE_DEFAULT_RADIUS = 200;
 
-    public static final String GEOFENCE_HOME = "{\"name\":\"home\",\"lat\":47.820683,\"long\":13.016048}";
+    public static final String GEOFENCE_HOME = "{\"name\":\"home\",\"lat\":47.8201718,\"long\":13.016651}";
     private static final String SHARED_PREFERENCES_NAME = "geofences.xml";
     private static final String KEY_GEOFENCE_LIST = "fences";
+    private static final String KEY_GEOFENCE_FILTER_LIST = "filtered_fences";
 
     /**
      * For this sample, geofences expire after twelve hours.
@@ -51,10 +53,11 @@ public class GeofenceService {
         mGeofencingClient = LocationServices.getGeofencingClient(context);
         mGeofenceList = new ArrayList<>();
 
-        Set<String> fences = getPrefs().getStringSet(KEY_GEOFENCE_LIST, null);
+        Set<String> fences = getPrefs(mContext).getStringSet(KEY_GEOFENCE_LIST, null);
         if (fences == null) {
             fences = new HashSet<>();
             fences.add(GEOFENCE_HOME);
+            getPrefs(mContext).edit().putStringSet(KEY_GEOFENCE_LIST, fences).commit();
         }
         createFences(fences);
     }
@@ -62,7 +65,7 @@ public class GeofenceService {
     public void initHomeFence() {
         Set<String> fences = new HashSet<>();
         fences.add(GEOFENCE_HOME);
-        getPrefs().edit().putStringSet(KEY_GEOFENCE_LIST, fences);
+        getPrefs(mContext).edit().putStringSet(KEY_GEOFENCE_LIST, fences).commit();
         createFences(fences);
     }
 
@@ -77,7 +80,7 @@ public class GeofenceService {
             fences.add(fence.toString());
         } catch (JSONException e) {
         }
-        getPrefs().edit().putStringSet(KEY_GEOFENCE_LIST, fences);
+        getPrefs(mContext).edit().putStringSet(KEY_GEOFENCE_LIST, fences).commit();
         createFences(fences);
     }
 
@@ -89,7 +92,7 @@ public class GeofenceService {
                 Log.d(TAG, "create fence" + fence);
                 mGeofenceList.add(new Geofence.Builder()
                         .setRequestId(jsonFence.getString(Database.KEY_GEOFENCE_NAME))
-                        .setCircularRegion(jsonFence.getDouble(Database.KEY_LOCATION_LAT), jsonFence.getDouble(Database.KEY_LOCATION_LONG), 100)
+                        .setCircularRegion(jsonFence.getDouble(Database.KEY_LOCATION_LAT), jsonFence.getDouble(Database.KEY_LOCATION_LONG), GEOFENCE_DEFAULT_RADIUS)
                         .setExpirationDuration(GEOFENCE_EXPIRATION_IN_MILLISECONDS)
                         .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
                                 Geofence.GEOFENCE_TRANSITION_EXIT)
@@ -136,7 +139,23 @@ public class GeofenceService {
         }
     }
 
-    private SharedPreferences getPrefs() {
-        return mContext.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);
+    private static SharedPreferences getPrefs(Context context) {
+        return context.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);
+    }
+
+    public static boolean isFilteredFence(Context context, String fence) {
+        return getPrefs(context).getStringSet(KEY_GEOFENCE_FILTER_LIST, new HashSet<String>()).contains(fence);
+    }
+
+    public static Set<String> getFilteredFences(Context context) {
+        return getPrefs(context).getStringSet(KEY_GEOFENCE_FILTER_LIST, new HashSet<String>());
+    }
+
+    public static void setFilteredFences(Context context, Set<String> fences) {
+        getPrefs(context).edit().putStringSet(KEY_GEOFENCE_FILTER_LIST, fences).commit();
+    }
+
+    public static Set<String> getFenceList(Context context) {
+        return getPrefs(context).getStringSet(KEY_GEOFENCE_LIST, new HashSet<String>());
     }
 }

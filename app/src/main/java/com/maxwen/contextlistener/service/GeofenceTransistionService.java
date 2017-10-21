@@ -6,6 +6,7 @@ import android.content.Intent;
 import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.GeofencingEvent;
 import com.maxwen.contextlistener.db.Database;
+import com.maxwen.contextlistener.location.GeofenceService;
 
 import java.util.List;
 
@@ -30,9 +31,11 @@ public class GeofenceTransistionService extends IntentService {
                 geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
             List<Geofence> triggeringGeofences = geofencingEvent.getTriggeringGeofences();
             for (Geofence fence : triggeringGeofences) {
-                new Database(this).addGeofenceEvent(System.currentTimeMillis(), fence.getRequestId(),
-                        geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER ?
-                                Database.KEY_GEOFENCE_ACTION_ENTER : Database.KEY_GEOFENCE_ACTION_LEAVE);
+                if (GeofenceService.isFilteredFence(this, fence.getRequestId())) {
+                    new Database(this).addGeofenceEvent(System.currentTimeMillis(), fence.getRequestId(),
+                            geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER ?
+                                    Database.KEY_GEOFENCE_ACTION_ENTER : Database.KEY_GEOFENCE_ACTION_LEAVE);
+                }
             }
         }
     }

@@ -5,10 +5,16 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.UriMatcher;
 import android.database.Cursor;
+import android.database.MatrixCursor;
 import android.net.Uri;
 import android.util.Log;
 
+import com.maxwen.contextlistener.bluetooth.BluetoothService;
 import com.maxwen.contextlistener.db.Database;
+import com.maxwen.contextlistener.location.GeofenceService;
+import com.maxwen.contextlistener.network.NetworkService;
+
+import java.util.Set;
 
 /**
  * Created by maxl on 10/14/17.
@@ -22,6 +28,11 @@ public class EventProvider extends ContentProvider {
     private static final int URI_TYPE_EVENTS_ALL = 2;
     private static final int URI_TYPE_EVENTS_GEOFENCE = 3;
     private static final int URI_TYPE_EVENTS_NETWORK = 4;
+    private static final int URI_TYPE_EVENTS_BLUETOOTH = 5;
+    private static final int URI_TYPE_FILTER_BLUETOOTH = 6;
+    private static final int URI_TYPE_FILTER_NETWORK = 7;
+    private static final int URI_TYPE_FILTER_GEOFENCE = 8;
+
     private static final UriMatcher sUriMatcher;
 
     public static final String CONTENT_TYPE =
@@ -33,6 +44,10 @@ public class EventProvider extends ContentProvider {
         sUriMatcher.addURI(AUTHORITY, "events/all", URI_TYPE_EVENTS_ALL);
         sUriMatcher.addURI(AUTHORITY, "events/geofence", URI_TYPE_EVENTS_GEOFENCE);
         sUriMatcher.addURI(AUTHORITY, "events/network", URI_TYPE_EVENTS_NETWORK);
+        sUriMatcher.addURI(AUTHORITY, "events/bluetooth", URI_TYPE_EVENTS_BLUETOOTH);
+        sUriMatcher.addURI(AUTHORITY, "filter/network", URI_TYPE_FILTER_NETWORK);
+        sUriMatcher.addURI(AUTHORITY, "filter/bluetooth", URI_TYPE_FILTER_BLUETOOTH);
+        sUriMatcher.addURI(AUTHORITY, "filter/geofence", URI_TYPE_FILTER_GEOFENCE);
     }
 
 
@@ -58,6 +73,35 @@ public class EventProvider extends ContentProvider {
             return new Database(getContext()).query(projection, Database.KEY_TYPE + " =? ", new String[]{String.valueOf(Database.KEY_TYPE_GEFOENCE)}, sortOrder);
         } else if (projectionType == URI_TYPE_EVENTS_NETWORK) {
             return new Database(getContext()).query(projection, Database.KEY_TYPE + " =? ", new String[]{String.valueOf(Database.KEY_TYPE_NETWORK)}, sortOrder);
+        } else if (projectionType == URI_TYPE_EVENTS_BLUETOOTH) {
+            return new Database(getContext()).query(projection, Database.KEY_TYPE + " =? ", new String[]{String.valueOf(Database.KEY_TYPE_BT)}, sortOrder);
+        } else if (projectionType == URI_TYPE_FILTER_NETWORK) {
+            final Set<String> filteredNetworks = NetworkService.getFilteredNetworks(getContext());
+            MatrixCursor cursor = new MatrixCursor(new String[] { "network"});
+            for (String device : filteredNetworks) {
+                MatrixCursor.RowBuilder builder = cursor.newRow();
+                builder.add("network", device);
+            }
+            cursor.setNotificationUri(getContext().getContentResolver(),uri);
+            return cursor;
+        } else if (projectionType == URI_TYPE_FILTER_BLUETOOTH) {
+            final Set<String> filteredDevices = BluetoothService.getFilteredBTDevices(getContext());
+            MatrixCursor cursor = new MatrixCursor(new String[] { "device"});
+            for (String device : filteredDevices) {
+                MatrixCursor.RowBuilder builder = cursor.newRow();
+                builder.add("device", device);
+            }
+            cursor.setNotificationUri(getContext().getContentResolver(),uri);
+            return cursor;
+        } else if (projectionType == URI_TYPE_FILTER_GEOFENCE) {
+            final Set<String> filteredFences = GeofenceService.getFilteredFences(getContext());
+            MatrixCursor cursor = new MatrixCursor(new String[] { "fence"});
+            for (String fence : filteredFences) {
+                MatrixCursor.RowBuilder builder = cursor.newRow();
+                builder.add("fence", fence);
+            }
+            cursor.setNotificationUri(getContext().getContentResolver(),uri);
+            return cursor;
         }
         return null;
     }

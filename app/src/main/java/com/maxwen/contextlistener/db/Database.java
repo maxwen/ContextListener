@@ -37,8 +37,18 @@ public class Database extends SQLiteOpenHelper {
     public static final String KEY_LOCATION_LAT = "lat";
     public static final String KEY_LOCATION_LONG = "long";
     public static final String KEY_NETWORK_TYPE = "network";
+
     public static final String KEY_AP_NAME = "ap";
+    public static final String KEY_NETWORK_ACTION = "action";
+    public static final String KEY_NETWORK_ACTION_CONNECT = "connect";
+    public static final String KEY_NETWORK_ACTION_DISCONNECT = "disconnect";
+
     public static final String KEY_BT_DEVICE_NAME = "device";
+    public static final String KEY_BT_DEVICE_ACTION = "action";
+    public static final String KEY_BT_DEVICE_ACTION_CONNECT = "connect";
+    public static final String KEY_BT_DEVICE_ACTION_DISCONNECT = "disconnect";
+    public static final String KEY_BT_DEVICE_ACTION_DISABLE = "disable";
+
     public static final String KEY_NFC_TAG_ID = "tag";
     public static final String KEY_POWER_CHARGING = "charging";
     public static final String KEY_GEOFENCE_NAME = "name";
@@ -111,7 +121,7 @@ public class Database extends SQLiteOpenHelper {
         return null;
     }
 
-    public void addNetworkEvent(long timeStamp, String type, String accessPoint) {
+    public void addNetworkEvent(long timeStamp, String type, String accessPoint, String action) {
         SQLiteDatabase db = this.getWritableDatabase();
 
         try {
@@ -120,6 +130,7 @@ public class Database extends SQLiteOpenHelper {
             if (accessPoint != null) {
                 networkData.put(KEY_AP_NAME, accessPoint);
             }
+            networkData.put(KEY_NETWORK_ACTION, action);
 
             ContentValues values = new ContentValues();
             values.put(KEY_TIMESTAMP, timeStamp);
@@ -151,12 +162,13 @@ public class Database extends SQLiteOpenHelper {
         return null;
     }
 
-    public void addBTEvent(long timeStamp, String btDevice) {
+    public void addBTEvent(long timeStamp, String btDevice, String action) {
         SQLiteDatabase db = this.getWritableDatabase();
 
         try {
             JSONObject btDeviceData = new JSONObject();
             btDeviceData.put(KEY_BT_DEVICE_NAME, btDevice);
+            btDeviceData.put(KEY_BT_DEVICE_ACTION, action);
 
             ContentValues values = new ContentValues();
             values.put(KEY_TIMESTAMP, timeStamp);
@@ -164,6 +176,7 @@ public class Database extends SQLiteOpenHelper {
             values.put(KEY_DATA, btDeviceData.toString());
             db.insert(TABLE_EVENTS, null, values);
             updateProvider();
+            updateBTProvider();
         } catch (JSONException e) {
 
         } finally {
@@ -277,6 +290,11 @@ public class Database extends SQLiteOpenHelper {
     private void updateGeofenceProvider() {
         mContext.getContentResolver().notifyChange(
                 Uri.parse("content://" + EventProvider.AUTHORITY + "/events/geofence"), null);
+    }
+
+    private void updateBTProvider() {
+        mContext.getContentResolver().notifyChange(
+                Uri.parse("content://" + EventProvider.AUTHORITY + "/events/bluetooth"), null);
     }
 
     public void addGeofenceEvent(long timeStamp, String geoFenceId, String action) {

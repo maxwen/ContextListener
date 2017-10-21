@@ -1,6 +1,8 @@
 package com.maxwen.contextlistener.network;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
@@ -9,48 +11,72 @@ import android.util.Log;
 
 import com.maxwen.contextlistener.db.Database;
 
+import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class NetworkService {
     private static final String TAG = "NetworkService";
     private static final boolean DEBUG = true;
+    private static final String SHARED_PREFERENCES_NAME = "network";
+    private static final String KEY_FILTERED_APS = "access_points";
 
-    public static void updateNetworkInfo(Context context) {
-        if (isNetworkAvailable(context) && isNewNetwork(context, getNetworkType(context), getWifiName(context))) {
-            if (DEBUG) Log.d(TAG, "Update network");
-
-            Database database = new Database(context);
-            database.addNetworkEvent(System.currentTimeMillis(), getNetworkType(context), isWifiNetwork(context) ? getWifiName(context) : null);
-        }
-    }
-
-    private static boolean isNetworkAvailable(Context context) {
+    public static void updateNetworkInfo(Context context, Intent intent) {
         ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo info = cm.getActiveNetworkInfo();
-        if (info != null && info.isConnected()) {
-            return true;
+        if (info == null) {
+            return;
         }
-        return false;
+        if (isFilteredNetwork(context, info)) {
+            if (!info.isConnected()) {
+                handleNetworkDisconnect(context, info);
+            }
+
+            if (isNewNetwork(context, getNetworkType(context, info), getWifiName(context))) {
+                handleNetworkDisconnect(context, info);
+                Database database = new Database(context);
+                database.addNetworkEvent(System.currentTimeMillis(), getNetworkType(context, info),
+                        isWifiNetwork(context, info) ? getWifiName(context) : null,
+                        info.isConnected() ? Database.KEY_NETWORK_ACTION_CONNECT : Database.KEY_NETWORK_ACTION_DISCONNECT);
+            }
+        }
     }
 
-    private static String getNetworkType(Context context) {
-        if (isWifiNetwork(context)) {
+    public static void handleNetworkDisconnect(Context context,NetworkInfo info) {
+        try {
+            Database database = new Database(context);
+            JSONObject networkData = database.getLastNetworkEvent();
+            if (networkData != null) {
+                String networkType = networkData.getString(Database.KEY_NETWORK_TYPE);
+                String apName = null;
+                if (networkType.equals("wifi")) {
+                    apName = networkData.getString(Database.KEY_AP_NAME);
+                }
+                boolean connected = networkData.getString(Database.KEY_NETWORK_ACTION).equals(Database.KEY_NETWORK_ACTION_CONNECT);
+                if (connected) {
+                    database.addNetworkEvent(System.currentTimeMillis(), networkType, apName, Database.KEY_NETWORK_ACTION_DISCONNECT);
+                }
+            }
+        } catch(JSONException e) {
+        }
+    }
+
+    private static String getNetworkType(Context context, NetworkInfo info) {
+        if (isWifiNetwork(context, info)) {
             return "wifi";
         }
-        if (isWMobileNetwork(context)) {
+        if (isWMobileNetwork(context, info)) {
             return "mobile";
         }
-        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo info = cm.getActiveNetworkInfo();
         if (info != null && info.isConnected()) {
             return "unknown";
         }
         return "offline";
     }
 
-    private static boolean isWifiNetwork(Context context) {
-        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo info = cm.getActiveNetworkInfo();
+    private static boolean isWifiNetwork(Context context, NetworkInfo info) {
         if (info != null && info.isConnected()) {
             if (info.getType() == ConnectivityManager.TYPE_WIFI ||
                     info.getType() == ConnectivityManager.TYPE_WIMAX) {
@@ -60,9 +86,7 @@ public class NetworkService {
         return false;
     }
 
-    private static boolean isWMobileNetwork(Context context) {
-        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo info = cm.getActiveNetworkInfo();
+    private static boolean isWMobileNetwork(Context context, NetworkInfo info) {
         if (info != null && info.isConnected()) {
             if (info.getType() == ConnectivityManager.TYPE_MOBILE ||
                     info.getType() == ConnectivityManager.TYPE_MOBILE_DUN) {
@@ -108,5 +132,25 @@ public class NetworkService {
         }
         Log.d(TAG, "no new network");
         return false;
+    }
+
+    private static SharedPreferences getPrefs(Context context) {
+        return context.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);
+    }
+
+    private static boolean isFilteredNetwork(Context context, NetworkInfo info) {
+        if (isWifiNetwork(context, info)) {
+            String apName = getWifiName(context);
+            return getPrefs(context).getStringSet(KEY_FILTERED_APS, new HashSet<String>()).contains(apName);
+        }
+        return true;
+    }
+
+    public static Set<String> getFilteredNetworks(Context context) {
+        return getPrefs(context).getStringSet(KEY_FILTERED_APS, new HashSet<String>());
+    }
+
+    public static void setFilteredNetworks(Context context, Set<String> networks) {
+        getPrefs(context).edit().putStringSet(KEY_FILTERED_APS, networks).commit();
     }
 }
